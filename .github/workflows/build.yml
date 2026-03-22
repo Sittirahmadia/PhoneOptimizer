@@ -3,7 +3,7 @@ name: Build APK
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:  # bisa trigger manual dari GitHub
+  workflow_dispatch:
 
 jobs:
   build:
@@ -28,11 +28,11 @@ jobs:
             autoconf libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             libffi-dev libssl-dev cmake \
-            libltdl-dev
+            libltdl-dev lld
 
       - name: 📦 Install buildozer & Cython
         run: |
-          pip install --upgrade pip
+          pip install --upgrade pip setuptools
           pip install buildozer==1.5.0 cython==0.29.36
 
       - name: 🗃️ Cache buildozer global dir
@@ -45,20 +45,36 @@ jobs:
 
       - name: 🔨 Build APK (debug)
         run: |
-          buildozer android debug 2>&1 | tee build.log
+          buildozer -v android debug 2>&1 | tee build.log
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
 
-      - name: 📤 Upload APK sebagai Artifact
+      - name: 🔍 Cari lokasi APK
+        if: always()
+        run: |
+          echo "=== Isi folder bin/ ==="
+          ls -la bin/ 2>/dev/null || echo "Folder bin/ tidak ada"
+          echo ""
+          echo "=== Cari semua file .apk ==="
+          find . -name "*.apk" 2>/dev/null || echo "Tidak ada .apk ditemukan"
+          echo ""
+          echo "=== 50 baris terakhir build log ==="
+          tail -50 build.log
+
+      - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PhoneOptimizer-APK
-          path: bin/*.apk
+          path: |
+            bin/*.apk
+            **/*.apk
+          if-no-files-found: warn
           retention-days: 30
 
-      - name: 📤 Upload build log (jika gagal)
-        if: failure()
+      - name: 📤 Upload build log (selalu)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-log
           path: build.log
+          retention-days: 7
